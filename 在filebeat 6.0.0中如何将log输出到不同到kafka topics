@@ -1,0 +1,281 @@
+在filebeat 5.x的版本中，如果你想在一个filebeat agent上收集不同的log，然后publish到不同的kakfa topics，可以这样做：
+
+定义多个 prospector，为每个prospector设置不同的document_type
+在kafka output中，使用%{[type]}，来获取不同的document_type值，然后设置到topic中。（注意，请不要使用网上有些人说的topics，那是画蛇添足）
+如下例：
+
+filebeat.prospectors:
+    # App logs - prospector
+    - input_type: log
+      paths:
+        - /myapp/logs/myapp.log
+      exclude_lines: [".+? INFO[^*].+", ".+? DEBUG[^*].+"]
+      exclude_files: [".gz$", ".tmp"]
+      fields:
+        api: myappapi
+        environment: STG
+      ignore_older: 24h
+      document_type: applog_myappapi
+      scan_frequency: 1s
+
+      # Multine on Timestamp, YYYY-MM-DD
+      # https://www.elastic.co/guide/en/beats/filebeat/master/multiline-examples.html 
+      multiline:
+        pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+        negate: true
+        match: after
+        max_lines: 500
+        timeout: 5s
+
+    # Server Stats - prospector
+    - input_type: log
+      paths:
+        - /myapp/logs/serverstats.log
+
+      # Exclude messages with log level
+      exclude_lines: [".+? ERROR[^*].+", ".+? DEBUG[^*].+"]
+      exclude_files: [".gz$", ".tmp"]
+      fields:
+        api: myappapi
+        environment: STG
+      ignore_older: 24h
+      document_type: applog_myappapi_stats
+      scan_frequency: 1s
+
+    # ELB prospector
+    -
+      input_type: log
+      paths:
+        - /var/log/httpd/elasticbeanstalk-access_log
+      document_type: elblog_myappapi
+      fields:
+        api: myappapi
+        environment: STG
+      exclude_lines: [".+? INFO[^*].+", ".+? DEBUG[^*].+"]
+      exclude_files: [".gz$", ".tmp"]
+      ignore_older: 24h
+
+      # 0s, it is done as often as possible. Default: 10s
+      scan_frequency: 1s
+registry_file: /var/lib/filebeat/registry
+############################# Output ##########################################
+# Configure what outputs to use when sending the data collected by the beat.
+# Multiple outputs may be used.
+#----------------------------- Kafka output --------------------------------
+
+output.kafka:
+    # initial brokers for reading cluster metadata
+    hosts: ["broker.1.ip.address:9092", "broker.2.ip.address:9092", "broker.3.ip.address:9092"]
+
+    # message topic selection + partitioning
+
+    topic: '%{[type]}'
+    partition.round_robin:
+      reachable_only: false
+
+    required_acks: 1
+    compression: gzip
+    max_message_bytes: 1000000
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+但由于升级到6.0.0之后，document_type这个选项被deprecated了，也就没法通过%{[type]}来访问。因此，同样的配置会造成filebeat无法获得topic的配置，进而不能给kafka发送消息。而且还没有error log，cpu使用率一直是100%… 
+更坑爹的是，6.0.0的文档没有更新这一块，仍然给出了下面的例子：
+
+output.kafka:
+  # initial brokers for reading cluster metadata
+  hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+
+  # message topic selection + partitioning
+  topic: '%{[type]}'
+  partition.round_robin:
+    reachable_only: false
+
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+正确的做法是使用fields。然后通过%{[]}获取对应的值。例子：
+
+filebeat.prospectors:
+
+# Each - is a prospector. Most options can be set at the prospector level, so
+# you can use different prospectors for various configurations.
+# Below are the prospector specific configurations.
+
+- type: log
+
+  # Change to true to enable this prospector configuration.
+  enabled: true
+
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /var/log/test1.log
+    #- c:\programdata\elasticsearch\logs\*
+  fields:
+    log_topics: test1
+- type: log
+  enabled: true
+  paths:
+    - /var/log/test2.log
+  fields:
+    log_topics: test2
+#----------------------------- kafka output --------------------------------
+output.kafka:
+# Boolean flag to enable or disable the output module.
+  enabled: true
+
+# The list of Kafka broker addresses from where to fetch the cluster metadata.
+# The cluster metadata contain the actual Kafka brokers events are published
+# to.
+  hosts: [{{kafka_url}}]
+
+# The Kafka topic used for produced events. The setting can be a format string
+# using any event field. To set the topic from document type use `%{[type]}`.
+  topic: '%{[fields][log_topics]}'
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+对应的，在logstash上，如果要分别解释对应的topic：
+
+input {
+  kafka{
+        bootstrap_servers => "{{kafka_url}}"
+        topics => ["test1","test2"]
+        codec => "json"
+        consumer_threads => 2
+        enable_auto_commit => true
+        auto_commit_interval_ms => "1000"
+        group_id=> test
+  }
+}
+filter {
+  if[fields][log_topics] == "test1" {
+    grok {
+      patterns_dir => ["./patterns"]
+      match => {
+        "message" => "%{PLATFORM_SYSLOG}"
+      }
+    }
+  }
+  if[fields][log_topics] == "test2" {
+    grok {
+      patterns_dir => ["./patterns"]
+      match => {
+        "message" => "%{IAM_SYSLOG}"
+      }
+    }
+  }
