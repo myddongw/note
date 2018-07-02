@@ -1,0 +1,6 @@
+似乎6.0无法在elasticsearch.yml 指定了，需要通过接口调用设置。
+已经创建index并且close掉了，然后执行
+curl -XPUT 'http://192.168.0.38:9200/index/_settings?preserve_existing=true' -H 'Content-Type: application/json' -d '{
+"index.analysis.analyzer.default.type" : "ik"
+}'
+报：Unknown analyzer type [ik] for [default]
