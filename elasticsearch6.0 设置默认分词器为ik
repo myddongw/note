@@ -4,3 +4,6 @@ curl -XPUT 'http://192.168.0.38:9200/index/_settings?preserve_existing=true' -H 
 "index.analysis.analyzer.default.type" : "ik"
 }'
 报：Unknown analyzer type [ik] for [default]
+
+
+curl -XPOST 'localhost:9200/lookupindex/_open'
