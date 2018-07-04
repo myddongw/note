@@ -1,0 +1,13 @@
+win:
+
+下载 https://download.elastic.co/beats/filebeat/filebeat-5.0.0-windows.zip
+
+解压到 C:\Program Files
+重命名 filebeat-5.0.0-windows 目录为 Filebeat
+右键点击 PowerSHell 图标，选择『以管理员身份运行』
+运行下列命令，将 Filebeat 安装成 windows 服务：
+PS > cd 'C:\Program Files\Filebeat'
+PS C:\Program Files\Filebeat> .\install-service-filebeat.ps1
+注意
+
+可能需要额外授予执行权限。命令为：PowerShell.exe -ExecutionPolicy RemoteSigned -File .\install-service-filebeat.ps1.
