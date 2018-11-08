@@ -1,0 +1,18 @@
+index.number_of_shards" : "5"
+
+
+
+curl -H "Content-Type: application/json" -XPUT 'http://localhost:9200/_all/_settings?preserve_existing=true' -d '{
+  "index.number_of_replicas" : "0"
+}'
+
+
+PUT /fileserver-2018.10.10/_settings
+{
+    "number_of_replicas": 0
+}
+
+PUT /_all/_settings
+{
+    "number_of_replicas": 0
+}
