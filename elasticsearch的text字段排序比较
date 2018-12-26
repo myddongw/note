@@ -1,0 +1,9 @@
+PUT mail*/_mapping/doc/
+{
+  "properties": {
+    "to_digest": { 
+      "type":     "text",
+      "fielddata": true
+    }
+  }
+}
