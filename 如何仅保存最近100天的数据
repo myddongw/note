@@ -1,0 +1,43 @@
+如何仅保存最近100天的数据？
+有了上面的认知，仅保存近100天的数据任务分解为： 
+- 1）delete_by_query设置检索近100天数据； 
+- 2）执行forcemerge操作，手动释放磁盘空间。
+
+删除脚本如下：
+
+#!/bin/sh
+curl -H'Content-Type:application/json' -d'{
+    "query": {
+        "range": {
+            "pt": {
+                "lt": "now-100d",
+                "format": "epoch_millis"
+            }
+        }
+    }
+}
+' -XPOST "http://192.168.1.101:9200/logstash_*/
+_delete_by_query?conflicts=proceed"
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+merge脚本如下：
+
+#!/bin/sh
+curl -XPOST 'http://192.168.1.101:9200/_forcemerge?
+only_expunge_deletes=true&max_num_segments=1'
+--------------------- 
+作者：铭毅天下（公众号同名） 
+来源：CSDN 
+原文：https://blog.csdn.net/laoyang360/article/details/80038930 
+版权声明：本文为博主原创文章，转载请附上博文链接！
