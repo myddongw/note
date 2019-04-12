@@ -1,0 +1,4 @@
+PUT packetbeat*/_settings
+{
+"index.mapping.total_fields.limit": 20000
+}
