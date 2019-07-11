@@ -1,0 +1,15 @@
+GET _cat/thread_pool
+get _nodes/process
+
+POST _cluster/reroute
+{
+    "commands" : [
+        {
+          "allocate_empty_primary" : {
+                "index" : ".watches", "shard" : 0,
+                "node" : "elk-1",
+                "accept_data_loss" : true
+          }
+        }
+    ]
+}
