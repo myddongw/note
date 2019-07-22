@@ -1,0 +1,28 @@
+在维护ES集群的过程中，我们会经常遇到将某个ES实例临时下线，比如机器换硬盘，系统参数调整，调整完毕后，再将ES实例重新上线。ES提供了非常便利的API来支持这一点。
+
+操作过程
+es集群示例
+
+比如我们有这样一个ES集群，node-2需要临时下线
+
+step 1
+PUT _cluster/settings
+{
+  "transient" : {
+    "cluster.routing.allocation.exclude._name" : "node-2"
+  }
+}
+注意 这个操作是transient集群重启后，这个设置会失效
+
+step 2
+step1 配置完成以后，我们就会看到shard在集群中开始迁移，待迁移完成以后，对node-2进行处理
+
+step 3
+PUT _cluster/settings
+{
+  "transient" : {
+    "cluster.routing.allocation.exclude._name" : ""
+  }
+}
+只要让_name匹配不到对用的node即可
+
