@@ -1,0 +1,13 @@
+
+POST /_cluster/reroute
+{
+    "commands" : [
+        {
+          "allocate_stale_primary" : {
+                "index" : "sino-http_2019.08.13", "shard" : 3,
+                "node" : "node-5",
+                "accept_data_loss": true 
+          }
+        }
+    ]
+}
