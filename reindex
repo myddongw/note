@@ -1,0 +1,35 @@
+PUT /sino-http_2019.08.05bak
+{
+    "settings" : {
+        "number_of_shards" : 5
+    },
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "Tel_num": {
+        "type": "long"
+          }
+        }
+      }
+    }
+    
+    
+    
+    
+POST _reindex
+{
+  "source": {
+    "index": "sino-http*_2019.08.05",
+    "size": 10000
+  },
+  "dest": {
+    "index": "sino-http_2019.08.05bak"
+  }
+}
+
+GET _tasks?detailed=true&actions=*reindex
+GET /_mapping/field/Tel_num
+
+GET _cat/indices/sino-http*2019.08.0*
