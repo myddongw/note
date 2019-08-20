@@ -1,0 +1,292 @@
+Stack Overflow
+Products
+Customers
+Use cases
+Search…
+Log in Sign up
+By using our site, you acknowledge that you have read and understand our Cookie Policy, Privacy Policy, and our Terms of Service.
+
+Home
+PUBLIC
+Stack Overflow
+Tags
+Users
+Jobs
+TEAMS
+What’s this?
+
+
+
+Q&A for Work
+ElasticSearch: How to query a date field using an hours-range filter
+Ask Question
+Asked 3 years, 9 months ago
+Active 4 months ago
+Viewed 29k times
+
+13
+
+
+2
+Currently, I already know how to filter a days range from a (timestamp) date field. That's an easy one:
+
+"range": {
+    "date": {
+        "gte": "2015-11-01",
+        "lte": "2015-11-30"
+    }
+}
+But how to filter dates when you are interested in ranges based on hours like gte:"8:00:00" and lte:"10:00:00"? Is this possible?
+
+My requirement in other words: How to get all the events happening this month (15-11-01/15-11-30) but only between 8:00:00 am and 10:00:00?
+
+elasticsearch
+shareimprove this question
+edited Nov 5 '15 at 4:43
+asked Nov 5 '15 at 1:20
+
+xtingray
+7611 gold badge11 silver badge66 bronze badges
+Between those hours, for any day? – Nathan Tuggy Nov 5 '15 at 1:49
+Let's say I want to get all the records between 2015-10-01 and 2015-12-31, but only those that happened between this hour range: "8:00:00" and "10:00:00" – xtingray Nov 5 '15 at 1:53 
+Possible duplicate of Elasticsearch: Filtering by date and time as different fields – Val Nov 5 '15 at 4:53
+1
+Similar question, but not the same. In the other one, I assume that there is another field called "time", that changes the problem. – xtingray Nov 5 '15 at 18:50
+add a comment
+3 Answers
+active oldest votes
+
+17
+
+You can do it with your range filter to filter the correct days and then with a script filter to filter the desired hours, like this:
+
+{
+  "query": {
+    "filtered": {
+      "filter": {
+        "bool": {
+          "must": [
+            {
+              "range": {
+                "date": {
+                  "gte": "2015-11-01",
+                  "lte": "2015-11-30"
+                }
+              }
+            },
+            {
+              "script": {
+                "script": "doc.date.date.getHourOfDay() >= min && doc.date.date.getHourOfDay() <= max",
+                "params": {
+                  "min": 8,
+                  "max": 10
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+Note that you need to make sure to enable dynamic scripting in order for this query to work.
+
+shareimprove this answer
+answered Nov 5 '15 at 5:00
+
+Val
+118k66 gold badges168168 silver badges197197 bronze badges
+Thank you. It works perfect. By the way, I tried to add another script to filter minutes using the method "getMinuteOfHour" but it didn't work. Any suggestion? – xtingray Nov 5 '15 at 15:30
+Can you show that script? – Val Nov 5 '15 at 15:36
+Hi @Val could you please tell me from where getHourOfDay() method comes? does groovy script engine uses joda for datetime manipulation? I could not find any documentation – ChintanShah25 Dec 24 '15 at 22:24
+@ChintanShah25 yep, doc['field'].date returns a Joda MutableDateTime object for all fields of type date or long. Agreed, it's not explicitly mentioned in the official docs, but you can find that info the original ticket from 2010. – Val Dec 25 '15 at 5:11
+add a comment
+
+3
+
+If I understood your question correctly then I think you have to add new field which indexes only time like
+
+PUT your_index
+{
+  "mappings": {
+    "your_type": {
+      "properties": {
+        "time": {
+          "type":   "date",
+          "format": "HH:mm:ss"
+        }
+      }
+    }
+  }
+}
+Then you can query like this
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "range": {
+            "date": {
+              "gte": "2015-11-01",
+              "lte": "2015-11-30"
+            }
+          }
+        },
+        {
+          "range": {
+            "time": {
+              "gte": "08:00:00",
+              "lte": "10:00:00"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+Does this help?
+
+shareimprove this answer
+answered Nov 5 '15 at 2:57
+
+ChintanShah25
+8,82922 gold badges2626 silver badges3434 bronze badges
+Right now, my field "date" has this type: {"type":"date","format":"dateOptionalTime"}, it supports records like this 2015-11-04T22:10:02 and unfortunately I can't modify my indexes – xtingray Nov 5 '15 at 3:03 
+even in my application, I have the same format but thing is you can only search like "gte" : "2015-10-02T13:34:09", "lte" : "2015-10-05T12:00:00" which will give you results between that range and not what you want which is specific time range on specific days – ChintanShah25 Nov 5 '15 at 3:08
+add a comment
+
+1
+
+Here's what I once used to only get results from start of current day to 6pm:
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "query_string": {
+            "query": "(log_message:\"My Search String\")"
+          }
+        },
+        {
+          "range": {
+            "@timestamp": {
+              "time_zone": "CET",
+              "gt": "now-24h/d",
+              "lte": "now-24h/d+18h"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+the important part is "now-24h/d" which will round to midnight / begin of current day, although it is a bit tricky as it depends on whether you use gt/lt(e), see reference doc for details.
+
+shareimprove this answer
+edited Mar 6 '18 at 19:13
+answered Mar 5 '18 at 21:20
+
+icyerasor
+3,5432929 silver badges4343 bronze badges
+add a comment
+Your Answer
+ Post Your Answer
+By clicking “Post Your Answer”, you agree to our terms of service, privacy policy and cookie policy
+
+Not the answer you're looking for? Browse other questions tagged elasticsearch or ask your own question.
+Blog
+CROKAGE: A New Way to Search Stack Overflow
+Featured on Meta
+Congratulations to our 29 oldest beta sites - They're now no longer beta!
+Unicorn Meta Zoo #7: Interview with Nicolas
+Experiment: closing and reopening happens at 3 votes for the next 30 days…
+Should we burninate the [pop] tag?
+Looking for a job?
+CT Software Architect
+SiemensBeijing, China
+testingoop
+Be one of the first applicants
+Homekit Software Engineer (Quality Assurance)
+Apple Inc.Beijing, China
+cqa
+Back end engineers - China - Changing the face of entertainment
+iflixBeijing, China
+$50K - $90K
+node.jsgo
+Angular Developer with PWA experience
+DjangoForceNo office location
+$24K - $48KREMOTE
+angularjsprogressive-web-apps
+Linked
+1
+Elasticsearch: Filtering by date and time as different fields
+1
+Elasticsearch Query: How to get all the events happening in a period of days, but only between 8:00:00 am and 10:00:00am?
+0
+Elasticsearch — determine if a given time is within a TIME range
+Related
+1
+ElasticSearch - Range filter by date is not working,
+1
+deciphering the start and end date encoding of an elasticsearch query in kibana dashboard
+1
+Elasticsearch. Range query for strings with dashes
+3
+ElasticSearch: How to query a date field using a month & date range filter
+1
+@timestamp range query in elasticsearch
+4
+Elasticsearch date range query using two fields
+1
+elasticsearch 6: hours-range filter from @timestamp
+0
+How to join ElasticSearch query with multi_match, boosting, wildcard and filter?
+1
+Elasticsearch Query to show results of field values that appear in two date ranges?
+0
+ElasticSearch : Filter data by hour and minute on a timestamp field
+Hot Network Questions
+Have made several mistakes during the course of my PhD. Can't help but feel resentment. Can I get some advice about how to move forward?
+Why should P.I be willing to write strong LOR even if that means losing a undergraduate from his/her lab?
+How do neutron star binaries form?
+!I!n!s!e!r!t! !b!e!t!w!e!e!n!
+Peterhead Codes and Ciphers Club: Weekly Challenge
+more hot questions
+ Question feed
+
+STACK OVERFLOW
+Questions
+Jobs
+Developer Jobs Directory
+Salary Calculator
+Help
+Mobile
+PRODUCTS
+Teams
+Talent
+Advertising
+Enterprise
+COMPANY
+About
+Press
+Work Here
+Legal
+Privacy Policy
+Contact Us
+STACK EXCHANGE
+NETWORK
+Technology
+Life / Arts
+Culture / Recreation
+Science
+Other
+Blog
+Facebook
+Twitter
+LinkedIn
+site design / logo © 2019 Stack Exchange Inc; user contributions licensed under cc by-sa 3.0 with attribution required. rev 2019.8.16.34633
+
+Stack Overflow requires external JavaScript from another domain, which is blocked or failed to load. 
+https://stackoverflow.com/questions/33535092/elasticsearch-how-to-query-a-date-field-using-an-hours-range-filter?rq=1
