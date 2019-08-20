@@ -1,0 +1,8 @@
+filter {
+    mutate {
+        convert => ["request_time", "float"]
+    }
+}
+
+
+可以设置的转换类型包括："integer"，"float" 和 "string"。示例如下：
